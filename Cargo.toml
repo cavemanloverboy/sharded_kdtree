@@ -1,0 +1,20 @@
+[package]
+name = "sharded_kdtree"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dashmap = { version = "5.3.4", features = ["rayon"] }
+integer-sqrt = "0.1.5"
+itertools = "0.10.3"
+nabo = { path = "../nabo-rs" }
+num-traits = "0.2.15"
+parking_lot = "0.12.1"
+rayon = "1.5.3"
+
+
+[[bench]]
+name = "simple"
+harness = false
