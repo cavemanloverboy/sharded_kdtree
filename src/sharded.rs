@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 pub struct ShardedKDTree<T: Scalar, P: Point<T>, const D: usize> {
     /// The leafsize to use for the leaves of the shards
-    leafsize: u32,
+    pub leafsize: u32,
     /// The root nodes of the shards
     root_nodes: Arc<Vec<KDTree<T, P, D>>>,
 }
@@ -23,8 +23,7 @@ impl <T: Scalar + Signed + Send + Sync, P: Point<T> + Send + Sync, const D: usiz
         // Fairly chunk the data across the shards and create a knn for each shard.
         let root_nodes = Arc::new(fair_chunks(points, shards).collect::<Vec<_>>()
             .into_par_iter()
-            .enumerate()
-            .map(|(shard, point_subset)| {
+            .map(|point_subset| {
                 KDTree::new_with_bucket_size(point_subset, leafsize)
             })
             .collect());
@@ -58,7 +57,7 @@ impl <T: Scalar + Signed + Send + Sync, P: Point<T> + Send + Sync, const D: usiz
 
     }
 
-    pub fn knn_single(&self, k: u32, query: &P, print: &str) -> Vec<Neighbour<T, P>> {
+    pub fn knn_single(&self, k: u32, query: &P) -> Vec<Neighbour<T, P>> {
 
         // For every query point create a binary heap 
         let mut allocation = 

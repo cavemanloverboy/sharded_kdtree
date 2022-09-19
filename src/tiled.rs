@@ -1,13 +1,7 @@
-use std::num;
-use std::ops::Bound;
-use std::sync::Arc;
-
 use nabo::*;
-use nabo::dummy_point::{P2, P3};
 use rayon::prelude::*;
 use rayon::iter::{ParallelIterator, IntoParallelIterator};
 use num_traits::{Signed, FromPrimitive, Zero};
-use std::collections::BinaryHeap;
 use dashmap::{DashMap, ReadOnlyView};
 use itertools::Itertools;
 use crate::sharded::ShardedKDTree;
@@ -48,12 +42,12 @@ pub struct TileTree<T: Scalar, P: Point<T>, const D: usize> {
 pub struct TiledKDTree<T: Scalar, P: Point<T>, const D: usize> {
     pub tile_trees: ReadOnlyView<Index<D>, TileTree<T, P, D>>,
     pub tile_bounding_boxes: ReadOnlyView<Index<D>, BoundingBox<T, P, D>>,
-    deltas: [NotNan<T>; D],
-    boxsize: Option<[T; D]>,
+    pub deltas: [NotNan<T>; D],
+    pub boxsize: Option<[T; D]>,
     bounding_box: BoundingBox<T, P, D>,
-    tiles: [u32; D],
-    shards: u32,
-    leafsize: u32,
+    pub tiles: [u32; D],
+    pub shards: u32,
+    pub leafsize: u32,
 }
 
 impl <T, P, const D: usize> TiledKDTree<T, P, D>
@@ -176,8 +170,9 @@ where
         queries
             .par_iter()
             .map(|query| {
+
+                #[allow(unused)]
                 let mut query_count = 0;
-                let timer = std::time::Instant::now();
 
                 // Find which tile the box resides in
                 let relevant_tree_index: Index<D> = self.find_index(query, &self.bounding_box, &self.tiles);
@@ -187,7 +182,7 @@ where
 
                 // Collect neighbors in this tile
                 let mut neighbors = Vec::with_capacity(k as usize * 4);
-                let mut query_result = time_this_micros!("single", {relevant_sharded_tree.knn_single(k, query, "single")});
+                let mut query_result = time_this_micros!("single", {relevant_sharded_tree.knn_single(k, query)});
                 neighbors.append(&mut query_result);
                 query_count += 1;
 
@@ -213,7 +208,7 @@ where
 
                             // Get tree and do query
                             let ref second_tree = self.tile_trees.get(&relevant_second_index).unwrap().sharded_tree;
-                            query_result = time_this_micros!("second query", { second_tree.knn_single(k, query, "second") });
+                            query_result = time_this_micros!("second query", { second_tree.knn_single(k, query) });
                             neighbors.append(&mut query_result);
                             
                             query_count += 1;
@@ -241,7 +236,7 @@ where
 
                                 // Get tree and do query
                                 let ref next_tree = self.tile_trees.get(&relevant_next_index).unwrap().sharded_tree;
-                                let mut next_query_results = next_tree.knn_single(k, query, "thin");
+                                let mut next_query_results = next_tree.knn_single(k, query);
                                 query_count += 1;
 
                                 // Append, but wait to sort and truncate
@@ -258,7 +253,7 @@ where
 
                                 // Get tree and do query
                                 let ref next_tree = self.tile_trees.get(&relevant_next_index).unwrap().sharded_tree;
-                                let mut next_query_results = next_tree.knn_single(k, query, "many");
+                                let mut next_query_results = next_tree.knn_single(k, query);
                                 query_count += 1;
 
                                 // Append, but wait to sort and truncate
@@ -356,7 +351,7 @@ where
                             .sharded_tree;
 
                         // Collect neighbors in this tile
-                        neighbors.append(&mut image_relevant_sharded_tree.knn_single(k, image, "image"));
+                        neighbors.append(&mut image_relevant_sharded_tree.knn_single(k, image));
                         query_count += 1;
 
                         // // Check if we are done here
@@ -450,6 +445,7 @@ where
     }
 
     #[inline]
+    #[allow(unused)]
     fn find_index(&self, point: &P, bounding_box: &BoundingBox<T, P, D>, tiles: &[u32; D]) -> Index<D> {
         
         // let lower = bounding_box.lower;
@@ -878,6 +874,8 @@ fn get_inner_bounding_boxes_and_deltas_for_tiles<T: Scalar, P: Point<T>, const D
 #[test]
 fn test_bounding_box_3d() {
 
+    use nabo::dummy_point::P3;
+    
     // Define some set of points between (inclusive) [0,1]^3
     let points = [
         P3::new(0.0, 1.0, 0.0),
@@ -915,9 +913,6 @@ where
     T: Scalar,
     P: Point<T>, 
 {
-
-    // Caluculate spacings
-    let (lower, upper) = ([T::zero(); D], boxsize);
 
     points
         .iter()

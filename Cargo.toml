@@ -16,5 +16,5 @@ rayon = "1.5.3"
 
 
 [[bench]]
-name = "simple"
+name = "sharded"
 harness = false

@@ -2,7 +2,6 @@ use nabo::Neighbour;
 use nabo::dummy_point::*;
 use nabo::KDTree;
 use sharded_kdtree::sharded::ShardedKDTree;
-use sharded_kdtree::tiled::TiledKDTree;
 use rayon::prelude::*;
 use std::time::Instant;
 use integer_sqrt::IntegerSquareRoot;
@@ -13,7 +12,7 @@ fn main() {
     rayon::ThreadPoolBuilder::new().num_threads(NUM_THREADS).build_global().unwrap();
 
     const CLOUD_SIZE: u32 = 1_000_000;
-    const QUERY_COUNT: u32 = 10_000_000;
+    const QUERY_COUNT: u32 = 2_000_000;
 
     let pred = (CLOUD_SIZE * NUM_THREADS as u32 / QUERY_COUNT).integer_sqrt();
     println!("THEORETICAL MATCH IS {pred}");
@@ -34,12 +33,6 @@ fn main() {
         let sharded_tree = ShardedKDTree::<_,_,3>::new_with_bucket_size_and_shards(&cloud, 32, SHARDS);
         let sharded_build_time = timer.elapsed().as_micros();
         println!("sharded tree took {sharded_build_time} micros to build");
-
-        let tiles = [1, 2, 2];
-        let timer = Instant::now();
-        let tiled_tree = TiledKDTree::<_,_,3>::new(&cloud, &tiles, 2, 32, None).unwrap();
-        let tiled_build_time = timer.elapsed().as_micros();
-        println!("tiled/tiled tree took {tiled_build_time} micros to build");
 
         let queries = (0..QUERY_COUNT).map(|_| random_point_p3()).collect::<Vec<_>>();
         
@@ -64,34 +57,24 @@ fn main() {
 
             assert_eq!(unsharded_result, sharded_result);
 
-            let timer = Instant::now();
-            let _ = tiled_tree.knn(k, &queries);
-            let tiled_query_time = timer.elapsed().as_micros();
-            println!("tiled tree took {tiled_query_time} micros to query");
-
             // if sharded_query_time < unsharded_query_time {
             //     println!("SHARDED TREE WINS QUERY {:.2}%", 100.0*sharded_query_time as f64 / unsharded_query_time as f64)
             // } else {
             //     println!("UNSHARDED TREE WINS QUERY {:.2}%", 100.0*unsharded_query_time as f64 / sharded_query_time as f64)
             // }
-            let min_time = sharded_query_time.min(unsharded_query_time).min(tiled_query_time);
+            let min_time = sharded_query_time.min(unsharded_query_time);
             let sharded = sharded_query_time == min_time;
             let unsharded = unsharded_query_time == min_time;
-            let tiled = tiled_query_time == min_time;
             if sharded{ println!("SHARDED TREE WINS QUERY") }
             else if unsharded { println!("UNSHARDED TREE WINS QUERY") }
-            else if tiled { println!("TILED TREE WINS QUERY") }
 
             let sharded_overall = sharded_build_time + sharded_query_time;
             let unsharded_overall = unsharded_build_time + unsharded_query_time;
-            let tiled_overall = tiled_build_time + tiled_query_time;
-            let min_time = sharded_overall.min(unsharded_overall).min(tiled_overall);
+            let min_time = sharded_overall.min(unsharded_overall);
             let sharded = sharded_overall == min_time;
             let unsharded = unsharded_overall == min_time;
-            let tiled = tiled_overall == min_time;
             if sharded{ println!("SHARDED TREE WINS OVERALL") }
             else if unsharded { println!("UNSHARDED TREE WINS OVERALL") }
-            else if tiled { println!("TILED TREE WINS OVERALL") }
         }
     }
 
